@@ -53,4 +53,19 @@ router.get('/me', authMiddleware, (req, res) => {
   res.json({ id: u._id, name: u.name, email: u.email, farmName: u.farmName, hasHardware: u.hasHardware });
 });
 
+// PUT /api/auth/profile
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, farmName } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name, farmName },
+      { new: true }
+    );
+    res.json({ user: { id: user._id, name: user.name, email: user.email, farmName: user.farmName } });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

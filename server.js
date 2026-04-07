@@ -8,12 +8,13 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
+const allowedOrigins = [FRONTEND_URL, 'http://localhost:3001', 'http://localhost:3000', 'https://localhost', 'capacitor://localhost', 'ionic://localhost'];
 
 const io = socketIo(server, {
-  cors: { origin: [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'], methods: ['GET', 'POST'] }
+  cors: { origin: allowedOrigins, methods: ['GET', 'POST'] }
 });
 
-app.use(cors({ origin: [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'] }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/irrigation', {
@@ -37,6 +38,13 @@ io.on('connection', (socket) => {
 });
 
 app.set('io', io);
+
+// Keep-alive ping to prevent Render free tier from sleeping
+setInterval(() => {
+  const http = require('http');
+  const url = process.env.RENDER_EXTERNAL_URL;
+  if (url) http.get(url).on('error', () => {});
+}, 14 * 60 * 1000); // every 14 minutes
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
