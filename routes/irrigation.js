@@ -4,6 +4,18 @@ const IrrigationLog = require('../models/IrrigationLog');
 const Sensor = require('../models/Sensor');
 const auth = require('../middleware/auth');
 
+// GET /status?userId=xxx — ESP32 polls this to check if irrigation is active
+router.get('/status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ message: 'userId required' });
+    const active = await IrrigationLog.findOne({ userId, status: 'in-progress' });
+    res.json({ irrigating: !!active, plantRow: active?.plantRow || null });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST /start
 router.post('/start', auth, async (req, res) => {
   try {
