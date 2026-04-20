@@ -93,13 +93,46 @@ if (MQTT_BROKER) {
         io.to(`user_${userId}`).emit('sensorUpdate', sensor);
         console.log(`📊 MQTT sensor [${data.sensorId}] — Temp: ${data.temperature}°C Soil: ${data.soilMoisture}%`);
 
-        // Low moisture alert
+        // Save to history
+        const SensorHistory = require('./models/SensorHistory');
+        await SensorHistory.create({
+          userId, sensorId: data.sensorId,
+          plantRow: sensor.plantRow,
+          soilMoisture: data.soilMoisture,
+          temperature:  data.temperature,
+          humidity:     data.humidity,
+        });
+
+        // Mark user as having real hardware
+        const User = require('./models/User');
+        await User.findByIdAndUpdate(userId, { hasHardware: true });
+
+        // Low moisture alert — emit socket + save to notification store
         if (data.soilMoisture < 30) {
-          io.to(`user_${userId}`).emit('irrigationAlert', {
+          const alertPayload = {
             plantRow: sensor.plantRow,
             soilMoisture: data.soilMoisture,
-            message: `Low soil moisture in ${sensor.plantRow}`,
-          });
+            message: `Low soil moisture in ${sensor.plantRow} (${data.soilMoisture}%)`,
+          };
+          io.to(`user_${userId}`).emit('irrigationAlert', alertPayload);
+
+          // Save to in-memory notification store via internal POST
+          const notifStore = require('./routes/notifications');
+          const uid = String(userId);
+          const n = {
+            id: Date.now(),
+            message: alertPayload.message,
+            type: 'warning',
+            plantRow: sensor.plantRow,
+            timestamp: new Date(),
+            read: false
+          };
+          // Access the store directly
+          if (!global.notifStore) global.notifStore = {};
+          if (!global.notifStore[uid]) global.notifStore[uid] = [];
+          global.notifStore[uid].unshift(n);
+          if (global.notifStore[uid].length > 100) global.notifStore[uid].splice(100);
+          io.to(`user_${userId}`).emit('newNotification', n);
         }
       }
 

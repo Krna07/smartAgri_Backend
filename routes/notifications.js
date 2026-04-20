@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 
-// Per-user in-memory store
-const store = {};
+// Shared in-memory store — also used by server.js MQTT handler
 const getStore = (userId) => {
-  if (!store[userId]) store[userId] = [];
-  return store[userId];
+  if (!global.notifStore) global.notifStore = {};
+  if (!global.notifStore[userId]) global.notifStore[userId] = [];
+  return global.notifStore[userId];
 };
 
 router.get('/', auth, (req, res) => {
@@ -15,7 +15,14 @@ router.get('/', auth, (req, res) => {
 
 router.post('/', auth, (req, res) => {
   const uid = String(req.user._id);
-  const n = { id: Date.now(), message: req.body.message, type: req.body.type || 'info', plantRow: req.body.plantRow, timestamp: new Date(), read: false };
+  const n = {
+    id: Date.now(),
+    message: req.body.message,
+    type: req.body.type || 'info',
+    plantRow: req.body.plantRow,
+    timestamp: new Date(),
+    read: false
+  };
   const list = getStore(uid);
   list.unshift(n);
   if (list.length > 100) list.splice(100);
